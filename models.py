@@ -22,9 +22,9 @@ class User(db.Model):
 
     # Функция добавления нового пользователя (обязательно нужно указать id)
     @staticmethod
-    def add(user_id, user_name):
+    def add(user_alice_id, user_name):
         user = User(
-            id=user_id,
+            alice_id=user_alice_id,
             name=user_name
         )
         db.session.add(user)
@@ -66,10 +66,11 @@ class Book(db.Model):
 
     # Функция добавления новой книги (обязательно нужно указать id)
     @staticmethod
-    def add(user, book_id):
+    def add(user, book_google_id, book_status):
         book = Book(
             user=user,
-            id=book_id
+            google_id=book_google_id,
+            status=book_status
         )
         db.session.add(book)
         db.session.commit()
