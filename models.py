@@ -1,18 +1,18 @@
 from dbase import db
 
 
-# Таблица пользователей
+# User table
 class User(db.Model):
-    # ID пользователя в базе данных приложения
+    # User ID in the app database
     id = db.Column(db.Integer, primary_key=True)
 
-    # ID пользователя, выданный Алисой
+    # User ID given by Alice
     alice_id = db.Column(db.String(1000), unique=True, nullable=False)
 
-    # Имя пользователя, которое он указывает сам
+    # The user name that he specifies by himself
     name = db.Column(db.String(1000), nullable=False)
 
-    # Представление таблицы в виде класса
+    # Table view as a class
     def __repr__(self):
         return '<User {} {} {}>'.format(
             self.id,
@@ -20,7 +20,7 @@ class User(db.Model):
             self.name
         )
 
-    # Функция добавления нового пользователя (обязательно нужно указать id)
+    # Add new user function (you must specify the id)
     @staticmethod
     def add(user_alice_id, user_name):
         user = User(
@@ -30,32 +30,32 @@ class User(db.Model):
         db.session.add(user)
         db.session.commit()
 
-    # Функция удаления пользователя
+    # Delete user function
     @staticmethod
     def delete(user):
         db.session.delete(user)
         db.session.commit()
 
 
-# Таблица книг
+# Book table
 class Book(db.Model):
-    # ID пользователя в базе данных приложения
+    # User ID in the app database
     id = db.Column(db.Integer, primary_key=True)
 
-    # Привязка книги к конкретному пользователю
+    # Binding a book to a specific user
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     user = db.relationship('User', backref=db.backref('book_list', lazy=True))
 
-    # ID книги в библиотеке Google книг
+    # Book ID in Google books
     google_id = db.Column(db.String(1000), unique=True, nullable=False)
 
-    # Статус книги:
-    # 0 - книга в списке желаемых к прочтению
-    # 1 - книга в списке читаемых в данный момент
-    # 2 - книга в списке прочитанных
+    # The status of the book:
+    # 0 - book in the list of wishful books
+    # 1 - book in the list of now on reading books
+    # 2 - book in the list of already read books
     status = db.Column(db.Integer, nullable=False)
 
-    # Представление таблицы в виде класса
+    # Table view as a class
     def __repr__(self):
         return '<Book {} {} {} {}>'.format(
             self.id,
@@ -64,7 +64,7 @@ class Book(db.Model):
             self.status
         )
 
-    # Функция добавления новой книги (обязательно нужно указать id)
+    # Add new book function (you must specify the id)
     @staticmethod
     def add(user, book_google_id, book_status):
         book = Book(
@@ -75,36 +75,35 @@ class Book(db.Model):
         db.session.add(book)
         db.session.commit()
 
-    # Функция изменения статуса книги
+    # The function of changing the status of the book
     @staticmethod
     def change_status(book, book_new_status):
         book.status = book_new_status
         db.session.commit()
 
-    # Функция удаления книги из всех списков
+    # Delete book from all lists function
     @staticmethod
     def delete(book):
         db.session.delete(book)
         db.session.commit()
 
 
-# Таблица закладок
+# Bookmark table
 class Bookmark(db.Model):
-    # ID пользователя в базе данных приложения
+    # User ID in the app database
     id = db.Column(db.Integer, primary_key=True)
 
-    # Привязка закладки к конкретной книге, котороя находится в списке
-    # "читаемое в данный момент"
+    # Binding a bookmark to a specific book, which is in the "now on reading" list
     book_id = db.Column(db.Integer, db.ForeignKey('book.id'), nullable=False)
     book = db.relationship('Book', backref=db.backref('bookmark_list', lazy=True))
 
-    # Страница, на которой находится закладка
+    # The page where the bookmark is located
     page = db.Column(db.String(1000), unique=True, nullable=False)
 
-    # Название закладки, задаётся пользователем
+    # The name of the bookmark which is specified by the user
     title = db.Column(db.String(1000), nullable=False)
 
-    # Представление таблицы в виде класса
+    # Table view as a class
     def __repr__(self):
         return '<Bookmark {} {} {} {}>'.format(
             self.id,
@@ -113,7 +112,7 @@ class Bookmark(db.Model):
             self.title
         )
 
-    # Функция добавления новой закладки
+    # Add new bookmark function
     @staticmethod
     def add(book, bookmark_page, bookmark_title):
         bookmark = Book(
@@ -124,7 +123,7 @@ class Bookmark(db.Model):
         db.session.add(bookmark)
         db.session.commit()
 
-    # Функция удаления закладки
+    # Delete bookmark function
     @staticmethod
     def delete(bookmark):
         db.session.delete(bookmark)
