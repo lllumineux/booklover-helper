@@ -3,3 +3,4 @@ api_key_value.txt
 
 .idea
 __pycache__
+app.log
