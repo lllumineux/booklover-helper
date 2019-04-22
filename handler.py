@@ -63,7 +63,7 @@ def init_route(app, db):
         session_storage['alice_id'] = req['session']['user_id']
 
         # List of request words
-        req_words = req['request']['nlu']['tokens']
+        req_words = [word.lower() for word in req['request']['nlu']['tokens']]
 
         # Response text
         response_text = ''
@@ -77,6 +77,7 @@ def init_route(app, db):
                 # If the user uses skill for the first time
                 if user:
                     res['response']['text'] = 'Hello, {}! Do you want to see available commands?'.format(user.name)
+                    session_storage['username'] = user.name
                     session_storage['current_theme'] = 'need_instruction'
                 # If the user has already used the skill
                 else:
@@ -92,54 +93,191 @@ def init_route(app, db):
                     name = name.capitalize()
                     # New user creating
                     User.add(session_storage['alice_id'], name)
-                    res['response']['text'] = name.capitalize()
+                    res['response']['text'] = 'Nice to meet you, {}! That\'s what I can:\n{}'.format(name, '\n'.join(possibilities))
+                    session_storage['username'] = name
+                    session_storage['current_theme'] = 'what_to_do'
 
             # If the user was asked "Do you need instructions?"
             elif session_storage['current_theme'] == 'need_instruction':
                 for word in ['yes']:
+                    # If one of positive words is in request word list
                     if word in req_words:
                         res['response']['text'] = 'That\'s what I can:\n{}'.format(
                             '\n'.join(possibilities)
-                        )
+                        ) + '\nWhat do you want me to do?'
                         session_storage['current_theme'] = 'what_to_do'
                 for word in ['no']:
+                    # If one of negative words is in request word list
                     if word in req_words:
                         res['response']['text'] = 'Ok! What can I do for you?'
                         session_storage['current_theme'] = 'what_to_do'
 
             # If the user was asked "What to do?"
             elif session_storage['current_theme'] == 'what_to_do':
-                # If user asked to give a random book
-                if 'random' in req_words and 'book' in req_words:
-                    # Picking random letter
-                    letter = random.choice([let for let in string.ascii_letters])
-                    # Picking random book
-                    book = random.choice(get_book_list(text=letter))
-                    while not response_text:
-                        response_text = get_response_text_from_book(book)
-                    res['response']['text'] = response_text
-
-                # If user asked to give a certain book
-                elif 'book' in req_words:
+                if 'book' in req_words:
                     book_name, book_author, book_category = '', '', ''
-                    # If user specified book name
+
+                    # Getting book name
                     if 'called' in req_words:
                         book_name = ' '.join(
                             req_words[req_words.index('called') + 1:req_words.index('by'):] if 'by' in req_words
                             else req_words[req_words.index('called') + 1::]
-                        )
-                    # If user specified book author
+                        ).capitalize()
+
+                    # Getting book author
                     if 'by' in req_words:
-                        book_author = ' '.join(req_words[req_words.index('by') + 1::])
-                    # If user specified book category
+                        if 'on' in req_words:
+                            book_author = ' '.join(
+                                req_words[req_words.index('by') + 1:req_words.index('on'):]
+                            ).capitalize()
+                        elif 'in' in req_words:
+                            book_author = ' '.join(
+                                req_words[req_words.index('by') + 1:req_words.index('in'):]
+                            ).capitalize()
+                        elif 'to' in req_words:
+                            book_author = ' '.join(
+                                req_words[req_words.index('by') + 1:req_words.index('to'):]
+                            ).capitalize()
+                        elif 'from' in req_words:
+                            book_author = ' '.join(
+                                req_words[req_words.index('by') + 1:req_words.index('from'):]
+                            ).capitalize()
+                        else:
+                            book_author = ' '.join(
+                                req_words[req_words.index('by') + 1::]
+                            ).capitalize()
+
+                    # Getting book category
                     if 'in' in req_words and 'category' in req_words:
-                        book_category = ' '.join(req_words[req_words.index('in') + 1:req_words.index('category'):])
+                        book_category = ' '.join(
+                            req_words[req_words.index('in') + 1:req_words.index('category'):]
+                        ).capitalize()
+
+                    # If user asked for a random book
+                    if 'random' in req_words:
+                        # Picking random letter
+                        letter = random.choice([let for let in string.ascii_letters])
+                        # Picking random book
+                        while not response_text:
+                            book = random.choice(get_book_list(text=letter))
+                            response_text = get_response_text_from_book(book)
+                        res['response']['text'] = response_text + '\n\n\nWhat else I can do for you, {}?'.format(session_storage['username'])
+
+                    # If user wants to add book in the list
+                    elif 'list' in req_words:
+                        # Getting list type
+                        list_type = -1
+                        if 'wish' in req_words:
+                            list_type = 0
+                        elif 'now' in req_words and 'reading' in req_words:
+                            list_type = 1
+                        elif 'already' in req_words and 'read' in req_words:
+                            list_type = 2
+                        # If list type is not correct
+                        if list_type == -1:
+                            response_text = 'Specified list not found!'
+                            res['response']['text'] = response_text
+                            return
+                        # If user wants to add book in list
+                        if 'add' in req_words and 'to' in req_words:
+                            # If all data is correct
+                            if book_name and book_author and list_type != -1:
+                                user = User.query.filter_by(
+                                    alice_id=session_storage['alice_id']
+                                ).first()
+                                book = Book.query.filter_by(
+                                    title=book_name,
+                                    author=book_author
+                                ).first()
+                                if book:
+                                    response_text = 'Book already in \"{}\" list!'.format(
+                                        ['Wish', 'Now reading', 'Already read'][book.status]
+                                    )
+                                    res['response']['text'] = response_text
+                                else:
+                                    books = list(Book.query.filter_by(
+                                        status=list_type
+                                    ))
+                                    if len(books) >= 5:
+                                        res['response']['text'] = 'You can\'t add more than 5 books in one list!'
+                                    else:
+                                        Book.add(user, book_name, book_author, list_type)
+                                        res['response']['text'] = 'Book has been added!' + '\n\n\nWhat else I can do for you, {}?'.format(session_storage['username'])
+
+                        # If user wants to delete book from list
+                        elif 'delete' in req_words and 'from' in req_words:
+                            # If all data is correct
+                            if book_name and book_author and list_type != -1:
+                                book = Book.query.filter_by(
+                                    title=book_name,
+                                    author=book_author,
+                                    status=list_type
+                                ).first()
+                                if book:
+                                    Book.delete(book)
+                                    res['response']['text'] = 'Book has been deleted!' + '\n\n\nWhat else I can do for you, {}?'.format(session_storage['username'])
+                                else:
+                                    response_text = 'No such book in \"{}\" list!'.format(
+                                        ['Wish', 'Now reading', 'Already read'][list_type]
+                                    )
+                                    res['response']['text'] = response_text
+
                     # If any of parameters exist
-                    if any([book_name, book_author, book_category]):
-                        book = random.choice(get_book_list(title=book_name, author=book_author, category=book_category))
+                    elif any([book_name, book_author, book_category]):
+                        # Get book by parameters
+                        book = random.choice(get_book_list(
+                            title=book_name,
+                            author=book_author,
+                            category=book_category
+                        ))
+                        # Get response text
                         response_text = get_response_text_from_book(book)
                         if response_text:
+                            res['response']['text'] = response_text + '\n\n\nWhat else I can do for you, {}?'.format(session_storage['username'])
+                            session_storage['current_theme'] = 'what_to_do'
+
+                if 'books' in req_words and 'from' in req_words and 'list' in req_words:
+                    # Getting list type
+                        list_type = -1
+                        if 'wish' in req_words:
+                            list_type = 0
+                        elif 'now' in req_words and 'reading' in req_words:
+                            list_type = 1
+                        elif 'already' in req_words and 'read' in req_words:
+                            list_type = 2
+                        if list_type != -1:
+                            # Getting user
+                            user = User.query.filter_by(
+                                alice_id=session_storage['alice_id']
+                            ).first()
+                            # Getting book list
+                            books = [book for book in Book.query.filter_by(
+                                user_id=user.id,
+                                status=list_type
+                            )]
+                            # If chosen list has books in it
+                            if books:
+                                response_text = '\n\n\n'.join([
+                                    'Title:\n{}\n\n\nAuthor:\n{}'.format(
+                                        book.title,
+                                        book.author
+                                    ) for book in books
+                                ])
+                                res['response']['text'] = response_text
+                            # If no books found in chosen list
+                            else:
+                                response_text = '\"{}\" list is empty!'.format(
+                                    ['Wish', 'Now reading', 'Already read'][list_type]
+                                )
+                                res['response']['text'] = response_text
+                        else:
+                            response_text = 'Specified list not found!'
                             res['response']['text'] = response_text
+                # If user asks to tell him what bot can do
+                elif 'what' in req_words and 'can' in req_words:
+                    res['response']['text'] = 'That\'s what I can:\n{}'.format(
+                        '\n'.join(possibilities)
+                    ) + '\nWhat do you want me to do?'
         except Exception as e:
             print(e)
         # If no response text was picked or an error occurred
@@ -219,7 +357,7 @@ def init_route(app, db):
             return '\n\n\n'.join((
                 'Title:\n' + book_title,
                 'Authors:\n' + '\n'.join(book_authors),
-                'Description:\n' + book_description
+                'Description:\n' + book_description[:750:]
             ))
         except Exception as e:
             print(e)

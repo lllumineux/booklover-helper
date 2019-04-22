@@ -46,8 +46,11 @@ class Book(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     user = db.relationship('User', backref=db.backref('book_list', lazy=True))
 
-    # Book ID in Google books
-    google_id = db.Column(db.String(1000), unique=True, nullable=False)
+    # Book title
+    title = db.Column(db.String(1000), nullable=False)
+
+    # Book author
+    author = db.Column(db.String(1000), nullable=False)
 
     # The status of the book:
     # 0 - book in the list of wishful books
@@ -57,19 +60,21 @@ class Book(db.Model):
 
     # Table view as a class
     def __repr__(self):
-        return '<Book {} {} {} {}>'.format(
+        return '<Book {} {} {} {} {}>'.format(
             self.id,
             self.user_id,
-            self.google_id,
+            self.title,
+            self.author,
             self.status
         )
 
     # Add new book function (you must specify the id)
     @staticmethod
-    def add(user, book_google_id, book_status):
+    def add(user, book_title, book_author, book_status):
         book = Book(
             user=user,
-            google_id=book_google_id,
+            title=book_title,
+            author=book_author,
             status=book_status
         )
         db.session.add(book)
@@ -115,7 +120,7 @@ class Bookmark(db.Model):
     # Add new bookmark function
     @staticmethod
     def add(book, bookmark_page, bookmark_title):
-        bookmark = Book(
+        bookmark = Bookmark(
             book=book,
             page=bookmark_page,
             title=bookmark_title
